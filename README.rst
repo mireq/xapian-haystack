@@ -1,113 +1,133 @@
-Xapian-Haystack -- A backend for Django-Haystack
-================================================
+Xapian backend for Django-Haystack
+==================================
 
-Overview
+.. _Travis: https://travis-ci.org/notanumber/xapian-haystack
+
+.. image:: https://travis-ci.org/notanumber/xapian-haystack.svg?branch=master
+   :target: https://travis-ci.org/notanumber/xapian-haystack
+.. image:: https://coveralls.io/repos/notanumber/xapian-haystack/badge.svg?branch=master&service=github
+   :target: https://coveralls.io/github/notanumber/xapian-haystack?branch=master
+
+Xapian-haystack is a backend of `Django-Haystack <http://haystacksearch.org/>`__
+for the `Xapian <http://xapian.org>`__ search engine.
+Thanks for checking it out.
+
+You can find more information about Xapian `here <http://getting-started-with-xapian.readthedocs.org>`__.
+
+
+Features
 --------
-xapian-haystack is a backend for use with the Django Haystack search API and the Xapian search engine.
 
-* More information on Haystack can be found here: `haystacksearch.org <http://haystacksearch.org/>`_.
-* More information on Xapian can be found here: `xapian.org <http://xapian.org>`_.
+Xapian-Haystack provides all the standard features of Haystack:
+
+- Weighting
+- Faceted search (date, query, etc.)
+- Sorting
+- Spelling suggestions
+- EdgeNGram and Ngram (for autocomplete)
+
 
 Requirements
 ------------
 
-- Python 2.4 (May work with 2.3, but untested)
-- Django 1.0.x
-- Django-Haystack 2.0.X
-- Xapian 1.0.13+ (May work with earlier versions, but untested)
+- Python 2.7 or 3.3
+- Django 1.6+
+- Django-Haystack 2
+- Xapian 1.2.19+
 
-Notes
------
+In particular, we build this backend on `Travis`_ using:
 
-- Due to an issue with mod_python possibly causing deadlocks with Xapian (`issue #364 <http://trac.xapian.org/ticket/364>`_), when Python is not invoked through the "main interpreter", mod_python is not supported with xapian-haystack.  It may work, with some tweaking, but your mileage will vary.
+- Python 2.7 and 3.3
+- Django 1.6, 1.7 and 1.8
+- Django-Haystack (master)
+- Xapian 1.2.19 (in Python 2) and 1.3.3 (in both)
 
-- Because Xapian does not support simultaneous ``WritableDatabase`` connections, it is *strongly* recommended that users take care when using ``RealTimeSearchIndex``.  If there is a possibility of simultaneous write attempts on the database, keep in mind that they are likely to trigger multiple reindex attempts on the search index.  If this occurs an `DatabaseLockError` exception will be raised by Xapian.  To avoid this, either set ``WSGIDaemonProcess processes=1`` or use some other way of ensuring that there are not multiple attempts to write to the indexes.  Alternatively, use ``SearchIndex`` and a cronjob to reindex content at set time intervals (sample cronjob can be found `here <http://gist.github.com/216247>`_) or derive your own ``SearchIndex`` to implement some other form of keeping your indexes up to date.  A good alternative is to use a `QueuedSearchIndex <http://github.com/toastdriven/queued_search>`_.
 
 Installation
 ------------
 
-#. Copy or symlink ``xapian_backend.py`` into ``haystack/backends/`` or install it by running one of the following commands:
+First, install Xapian in your machine e.g. with the script provided,
+`install_xapian.sh`. Call it after activating the virtual environment to install::
 
-    ``python setup.py install``
+    source <path>/bin/activate
+    ./install_xapian.sh <version>
 
-    or
+`<version>` must be >=1.3.0 for Python 3 envs. This takes around 10 minutes.
 
-    ``pip install xapian-haystack``
+Finally, install Xapian-Haystack by running::
 
-    or
+    pip install git+https://github.com/notanumber/xapian-haystack.git
 
-    ``easy_install xapian-haystack``
-
-#. Set to something similar to:
-
-    HAYSTACK_CONNECTIONS = {
-        'default': {
-            'ENGINE': 'haystack.backends.xapian_backend.XapianEngine',
-            'PATH': os.path.join(os.path.dirname(__file__), 'xapian_index')
-        },
-    }
 
 Configuration
 -------------
 
-As well as the flags described `here <http://docs.haystacksearch.org/dev/settings.html>`_, the xapian backend includes two additional variables:
+Xapian is configured as other backends of Haystack.
+You have to define the connection to the database,
+which is done to a path to a directory, e.g::
 
-    - `HAYSTACK_XAPIAN_FLAGS` -- used to further configure how indexes are stored and manipulated.  By default, this value is set to `FLAG_PHRASE | FLAG_BOOLEAN | FLAG_LOVEHATE | FLAG_WILDCARD | FLAG_PURE_NOT`.  See the `Xapian::QueryParser::feature_flag in the Xapian documentation <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`_ for further explanation of the available Xapian.QueryParser flags.
+    HAYSTACK_CONNECTIONS = {
+        'default': {
+            'ENGINE': 'xapian_backend.XapianEngine',
+            'PATH': os.path.join(os.path.dirname(__file__), 'xapian_index')
+        },
+    }
 
-    - `HAYSTACK_XAPIAN_WEIGHTING_SCHEME` -- used to override the default weighting scheme used during search.  `HAYSTACK_XAPIAN_WEIGHTING_SCHEME` is assumed to be a tuple that corepsonds to the arguments to a BM25Weight constructor.  See `Xapian::BM25Weight::BM25Weight in the Xapian documentation <http://xapian.org/docs/apidoc/html/classXapian_1_1BM25Weight.html>`_ for further information.
+The backend has the following optional settings:
 
-    - `HAYSTACK_XAPIAN_LANGUAGE` -- used to override the default stemming language.  By default, Xapian will stem all terms in english.
+- ``HAYSTACK_XAPIAN_LANGUAGE``: the stemming language; the default is `english` and the list of available languages
+  can be found `here <http://xapian.org/docs/apidoc/html/classXapian_1_1Stem.html>`__.
+
+- ``HAYSTACK_XAPIAN_WEIGHTING_SCHEME``: a tuple with parameters to be passed to the weighting scheme
+  `BM25 <https://en.wikipedia.org/wiki/Okapi_BM25>`__.
+  By default, it uses the same parameters as Xapian recommends; this setting allows you to change them.
+
+- ``HAYSTACK_XAPIAN_FLAGS``: the options used to parse `AutoQueries`;
+  the default is ``FLAG_PHRASE | FLAG_BOOLEAN | FLAG_LOVEHATE | FLAG_WILDCARD | FLAG_PURE_NOT``
+  See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html>`__ for more information
+  on what they mean.
+
+- ``HAYSTACK_XAPIAN_STEMMING_STRATEGY``: This option lets you chose the stemming strategy used by Xapian. Possible
+  values are ``STEM_NONE``, ``STEM_SOME``, ``STEM_ALL``, ``STEM_ALL_Z``, where ``STEM_SOME`` is the default.
+  See `here <http://xapian.org/docs/apidoc/html/classXapian_1_1QueryParser.html#ac7dc3b55b6083bd3ff98fc8b2726c8fd>`__ for
+  more information about the different strategies.
+
 
 Testing
 -------
 
-The easiest way to test xapian-haystack is to symlink or copy the ``xapian_haystack/tests`` folder into the haystack/tests folder so that your source tree resembles this layout::
-
-    django-haystack
-        |
-        +---haystack
-        |       |
-        |       +---backends
-        |              |
-        |              +---solr_backend.py
-        |              +---whoosh_backend.py
-        |              +---xapian_backend.py
-        +---tests
-                |
-                +---core
-                |    |
-                |    +---[...]
-                |
-                +---[...]
-                |
-                +---xapian_tests
-                |       |
-                |       +---[...]
-                |
-                +---xapian_settings.py
-
-Once this is done, the tests can be executed in a similar fashion as the rest of the Haystack test-suite::
-
-    django-admin.py test xapian_tests --settings=xapian_settings
+Xapian-Haystack has a test suite in continuous deployment in `Travis`_. The script
+``.travis.yml`` contains the steps required to run the test suite.
 
 
 Source
 ------
 
-The latest source code can always be found here: `github.com/notanumber/xapian-haystack <http://github.com/notanumber/xapian-haystack/>`_
+The source code can be found in `github <http://github.com/notanumber/xapian-haystack/>`_.
+
 
 Credits
 -------
 
-xapian-haystack is maintained by `David Sauve <mailto:david.sauve@bag-of-holding.com>`_, and was originally funded by `Trapeze <http://www.trapeze.com>`_.
+Xapian-Haystack is maintained by `Jorge C. Leitão <http://jorgecarleitao.net>`__;
+`David Sauve <mailto:david.sauve@bag-of-holding.com>`__ was the main contributor of Xapian-Haystack and
+Xapian-Haystack was originally funded by `Trapeze <http://www.trapeze.com>`__.
+`ANtlord <https://github.com/ANtlord>`__ implemented support for EdgeNgram and Ngram.
+
 
 License
 -------
 
-xapian-haystack is Copyright (c) 2009, 2010, 2011, 2012 David Sauve, 2009, 2010 Trapeze. It is free software, and may be redistributed under the terms specified in the LICENSE file.
+Xapian-haystack is free software licenced under GNU General Public Licence v2 and
+Copyright (c) 2009, 2010, 2011, 2012 David Sauve, 2009, 2010 Trapeze, 2014 Jorge C. Leitão.
+It may be redistributed under the terms specified in the LICENSE file.
+
 
 Questions, Comments, Concerns:
 ------------------------------
 
-Feel free to open an issue here: `github.com/notanumber/xapian-haystack/issues <http://github.com/notanumber/xapian-haystack/issues>`_
-Alternatively, ask questions on the django-haystack `mailing list <http://groups.google.com/group/django-haystack/>`_ or `irc channel <irc://irc.freenode.net/haystack>`_.
+Feel free to open an issue `here <http://github.com/notanumber/xapian-haystack/issues>`__
+or pull request your work.
+
+You can ask questions on the django-haystack `mailing list <http://groups.google.com/group/django-haystack/>`_:
+or in the irc ``#haystack``.
